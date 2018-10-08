@@ -1,0 +1,50 @@
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/tm4c123gh6pm.h"
+#include "inc/hw_memmap.h"
+#include "inc/hw_types.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/interrupt.h"
+#include "driverlib/gpio.h"
+#include "driverlib/timer.h"
+
+int main(void)
+{
+    uint32_t ui32Period, dutycycle;
+
+    SysCtlClockSet(SYSCTL_SYSDIV_5|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+
+    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3);
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+
+    GPIOPinTypeTimer(GPIO_PORTF_BASE, GPIO_PIN_0);
+
+ //   GPIOPinConfigure(GPIO_PF0_T0CCP0);
+
+    TimerConfigure(TIMER0_BASE, TIMER_CFG_A_PWM);
+
+    ui32Period = (SysCtlClockGet()/2);  // clock period. change toggle of GPIO to 2 HZ, 75% duty cycle.
+    dutycycle = ui32Period / 4;
+    // 2HZ => total delay = 0.5s, 0.375 on, 0.125 off
+    TimerLoadSet(TIMER0_BASE, TIMER_A, ui32Period -1);
+    TimerMatchSet(TIMER0_BASE, TIMER_A, dutycycle);
+
+    TimerEnable(TIMER0_BASE, TIMER_A);
+// create delay subrotien without using the interupt.
+// basic delay should be 0.125s
+    while(1)
+    {
+
+        if((TimerValueGet(TIMER0_BASE, TIMER_A) < dutycycle)) //Blue LED is off when timer value is less than the dutycycle value.
+        {
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 0);
+        }
+        else
+        {
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 4);
+        }
+    }
+}
