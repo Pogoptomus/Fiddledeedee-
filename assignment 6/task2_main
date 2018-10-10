@@ -26,7 +26,6 @@ int main(void)
     ROM_SysCtlPWMClockSet(SYSCTL_PWMDIV_64);
 
     ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM1);
-//    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
     ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 
     ROM_GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_1);
