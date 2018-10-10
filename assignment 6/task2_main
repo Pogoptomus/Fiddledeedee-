@@ -1,0 +1,90 @@
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_memmap.h"
+#include "inc/hw_types.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/debug.h"
+#include "driverlib/pwm.h"
+#include "driverlib/pin_map.h"
+#include "inc/hw_gpio.h"
+#include "driverlib/rom.h"
+#include "inc/tm4c123gh6pm.h"
+
+#define PWM_FREQUENCY 55    // 55Hz base frequency
+
+int main(void)
+{
+    volatile uint32_t ui32Load;  //don't think i need this value
+    volatile uint32_t ui32PWMClock;
+    volatile uint8_t ui8Dutycycle;
+    // starting with a duty cycle of 50%
+    ui8Dutycycle = 50;
+    ROM_SysCtlClockSet(
+            SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN
+                    | SYSCTL_XTAL_16MHZ);
+    ROM_SysCtlPWMClockSet(SYSCTL_PWMDIV_64);
+
+    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM1);
+//    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
+    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+
+    ROM_GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_1);
+    ROM_GPIOPinConfigure(GPIO_PF1_M1PWM5);
+
+    HWREG(GPIO_PORTF_BASE + GPIO_O_LOCK) = GPIO_LOCK_KEY;
+    HWREG(GPIO_PORTF_BASE + GPIO_O_CR) |= 0x01;
+    HWREG(GPIO_PORTF_BASE + GPIO_O_LOCK) = 0;
+    ROM_GPIODirModeSet(GPIO_PORTF_BASE, GPIO_PIN_4 | GPIO_PIN_0,
+                       GPIO_DIR_MODE_IN);
+    ROM_GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_4 | GPIO_PIN_0,
+                         GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
+
+
+    // formula to calculate the number of cycles for the GenPeriod:
+    // Load = 1/PWMfrequency * PWMClk - 1.
+    // Load is the parameter, PWMfrequency is the desired frequency, PWMClk is the PWM clock frequency based off the system clock
+    // so for this task, Load = 1/55 * 625kHz-1 = 11363
+    ui32PWMClock = SysCtlClockGet() / 64;
+    ui32Load = (ui32PWMClock / PWM_FREQUENCY) - 1;
+    ROM_PWMGenConfigure(PWM1_BASE, PWM_GEN_2, PWM_GEN_MODE_DOWN);
+    ROM_PWMGenPeriodSet(PWM1_BASE, PWM_GEN_2, ui32Load);
+
+
+    // formula for number of cycles in duty cycle:
+    // N = %DC * Load
+    // N is the parameter, %DC is the percent duty cycle, Load
+    // starting with 50% DC: N = 50/100*11364 = 5682
+    ROM_PWMPulseWidthSet(PWM1_BASE, PWM_OUT_5, ui8Dutycycle * ui32Load / 100);
+    ROM_PWMOutputState(PWM1_BASE, PWM_OUT_5_BIT, true);
+
+    ROM_PWMGenEnable(PWM1_BASE, PWM_GEN_2);
+
+    while (1)
+    {
+        // Pulsewidth adjustments are made using the same formula above.
+        // the smallest duty cycle will be 10% and the largest will be 90%
+        if (ROM_GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4) == 0x00)
+        {
+            ui8Dutycycle--;
+            if (ui8Dutycycle < 10)
+            {
+                ui8Dutycycle = 10;
+            }
+            ROM_PWMPulseWidthSet(PWM1_BASE, PWM_OUT_5,
+                                 ui8Dutycycle * ui32Load / 100);
+        }
+
+        if (ROM_GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_0) == 0x00)
+        {
+            ui8Dutycycle++;
+            if (ui8Dutycycle > 90)
+            {
+                ui8Dutycycle = 90;
+            }
+            ROM_PWMPulseWidthSet(PWM1_BASE, PWM_OUT_5,
+                                 ui8Dutycycle * ui32Load / 100);
+        }
+        ROM_SysCtlDelay(100000);
+    }
+}
