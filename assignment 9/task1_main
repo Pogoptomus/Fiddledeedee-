@@ -1,0 +1,41 @@
+#include <stdint.h>
+#include <stdbool.h>
+#include <math.h>           // contains the sinf function
+#include "inc/hw_memmap.h"
+#include "inc/hw_types.h"
+#include "driverlib/fpu.h"  // header file that defines floating numbers
+#include "driverlib/sysctl.h"
+#include "driverlib/rom.h"
+
+#ifndef M_PI // define the value of pi if not already done so
+#define M_PI                    3.14159265358979323846
+#endif
+
+#define SERIES_LENGTH 100   // used to determine how many data points will be recorded
+float gSeriesData[SERIES_LENGTH]; // a floating point array of size SERIES_LENGTH used to store sin wave points
+int32_t i32DataCount = 0;   // counter for the sin function calculation
+
+int main(void)
+{
+    float fRadians;
+
+    ROM_FPULazyStackingEnable();    // enable lazy stacking. this allows the CPU to reserve space on the stack for the FPU state
+    ROM_FPUEnable();                // enable the floating point unit
+
+    ROM_SysCtlClockSet(
+            SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ
+                    | SYSCTL_OSC_MAIN);
+    //  since a full sin wave is 2Pi, divide by the number of steps taken, which in this case is 100, so fRadians = 0.062790519
+    fRadians = ((2 * M_PI) / SERIES_LENGTH);
+
+    while (i32DataCount < SERIES_LENGTH) // loop until all data points are recorded (in this case 100 times)
+    {
+        gSeriesData[i32DataCount] = sinf(fRadians * i32DataCount); // input the result of the sin function at each increment into the corresponding array location
+        i32DataCount++; // increment counter for next calculation
+    }
+
+    while (1)
+    {
+        // loop forever
+    }
+}
